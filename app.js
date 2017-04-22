@@ -128,8 +128,27 @@ var Bullet = function(angle){
     Bullet.list[self.id] = self;
     return self;
 }
+//
+// CLASS Bullet class
+//
 Bullet.list = {};
-
+Bullet.update = function(){
+	// Create bullet randomly
+	if (Math.random() < 0.1){
+		Bullet(Math.random()*360);
+	}
+	var pack = [];
+	// Go through player list and update their data.
+	for(var i in Bullet.list){
+		var bullet = Bullet.list[i];
+		bullet.update();
+		pack.push({
+			x: bullet.x,
+			y: bullet.y
+		});
+	}
+	return pack;
+}
 
 var io = require('socket.io')(serv,{});
 io.sockets.on('connection', function(socket){
@@ -149,8 +168,11 @@ io.sockets.on('connection', function(socket){
 // SERVER GAME LOOP
 // Servertick 25 times per second
 setInterval(function(){
-	// Do player update
-	var pack = Player.update();
+	// Do updates
+	var pack = {
+		player:Player.update(),
+		bullet:Bullet.update()
+	}
 
 	// Send everyones' positions to the client
 	for(var i in SOCKET_LIST){
