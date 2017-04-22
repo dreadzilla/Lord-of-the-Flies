@@ -2,6 +2,7 @@
 var express = require('express');
 var app = express();
 var serv = require('http').Server(app);
+var DEBUG = true;
 
 // Redirect to start file if /
 app.get('/',function(req, res) {
@@ -163,7 +164,19 @@ io.sockets.on('connection', function(socket){
 		delete SOCKET_LIST[socket.id];
 		Player.onDisconnect(socket);
 	});
-
+	// Send chats out.
+	socket.on('sendMsgToServer',function(data){
+		var playerName = ("" + socket.id).slice(2,7)
+		for (var i in SOCKET_LIST){
+			SOCKET_LIST[i].emit('addToChat',playerName+': '+data);
+		}
+	});
+	socket.on('evalServer',function(data){
+		if (!DEBUG)
+			return;
+		var res = eval(data);
+		socket.emit('evalAnswer',res);
+	});
 });
 // SERVER GAME LOOP
 // Servertick 25 times per second
