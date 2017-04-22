@@ -3,6 +3,7 @@ var express = require('express');
 var app = express();
 var serv = require('http').Server(app);
 var DEBUG = true;
+var collDist = 32; //Collision distance
 
 // Redirect to start file if /
 app.get('/',function(req, res) {
@@ -31,6 +32,9 @@ var Entity = function() {
 		self.x += self.spdX;
 		self.y += self.spdY;
 	}
+	self.getDistance = function(pt){
+    return Math.sqrt(Math.pow(self.x-pt.x,2) + Math.pow(self.y-pt.y,2));
+  }
 	return self;
 }
 
@@ -43,6 +47,8 @@ var Player = function(id){
 	self.pressingLeft = false,
 	self.pressingUp = false,
 	self.pressingDown = false,
+	self.pressingAttack = false,
+	self.mouseAngle = 0,
 	self.maxSpd = 10
 
 	var super_update = self.update;
@@ -50,6 +56,18 @@ var Player = function(id){
 	self.update = function() {
 		self.updateSpd();
 		super_update();
+
+		// Create bullet randomly
+		if (self.pressingAttack){
+			for (var i = -3; i<3;i++)
+				self.shootBullet(i*10+self.mouseAngle);
+			//self.shootBullet(self.mouseAngle)
+		}
+	}
+	self.shootBullet = function(angle){
+		var b = Bullet(self.id,angle);
+		b.x = self.x;
+		b.y = self.y;
 	}
 
 	self.updateSpd = function(){
@@ -89,6 +107,10 @@ Player.onConnect = function(socket){
 			player.pressingUp = data.state;
 		else if(data.inputId === 'down')
 			player.pressingDown = data.state;
+		else if(data.inputId === 'attack')
+			player.pressingAttack = data.state;
+		else if(data.inputId === 'mouseAngle')
+			player.mouseAngle = data.state;
 	});
 }
 // Remove disconnected player
@@ -111,12 +133,12 @@ Player.update = function(){
 }
 // ENd Player class
 
-var Bullet = function(angle){
+var Bullet = function(parent,angle){
     var self = Entity();
     self.id = Math.random();
     self.spdX = Math.cos(angle/180*Math.PI) * 10;
     self.spdY = Math.sin(angle/180*Math.PI) * 10;
-
+		self.parent = parent;
     self.timer = 0;
     self.toRemove = false;
 		// Override update loop
@@ -125,6 +147,13 @@ var Bullet = function(angle){
         if(self.timer++ > 100)
             self.toRemove = true;
         super_update();
+				for(var i in Player.list){
+					var p = Player.list[i];
+					if(self.getDistance(p) < collDist && self.parent !== p.id){
+						// Handle possible collision here
+						self.toRemove=true;
+					}
+				}
     }
     Bullet.list[self.id] = self;
     return self;
@@ -134,21 +163,46 @@ var Bullet = function(angle){
 //
 Bullet.list = {};
 Bullet.update = function(){
-	// Create bullet randomly
-	if (Math.random() < 0.1){
-		Bullet(Math.random()*360);
-	}
+
 	var pack = [];
 	// Go through player list and update their data.
 	for(var i in Bullet.list){
 		var bullet = Bullet.list[i];
 		bullet.update();
-		pack.push({
-			x: bullet.x,
-			y: bullet.y
-		});
+		if(bullet.toRemove)
+			delete Bullet.list[i];
+		else {
+			pack.push({
+				x: bullet.x,
+				y: bullet.y
+			});
+		}
 	}
 	return pack;
+}
+
+var USERS = {
+    //username:password
+    "bob":"asd",
+    "bob2":"bob",
+    "bob3":"ttt",
+}
+
+var isValidPassword = function(data,cb){
+    setTimeout(function(){
+        cb(USERS[data.username] === data.password); // callback
+    },10);
+}
+var isUsernameTaken = function(data,cb){
+    setTimeout(function(){
+        cb(USERS[data.username]);
+    },10);
+}
+var addUser = function(data,cb){
+    setTimeout(function(){
+        USERS[data.username] = data.password;
+        cb();
+    },10);
 }
 
 var io = require('socket.io')(serv,{});
@@ -157,7 +211,28 @@ io.sockets.on('connection', function(socket){
 	socket.id = Math.random();
 	SOCKET_LIST[socket.id] = socket;
 
-	Player.onConnect(socket);
+	socket.on('signIn',function(data){
+		isValidPassword(data,function(res){
+	  	if(res){
+	    	Player.onConnect(socket);
+	      socket.emit('signInResponse',{success:true});
+			} else {
+	     	socket.emit('signInResponse',{success:false});
+	    }
+	  });
+	});
+	socket.on('signUp',function(data){
+		isUsernameTaken(data,function(res){
+	  	if(res){
+	    	socket.emit('signUpResponse',{success:false});
+			} else {
+	    	addUser(data,function(){
+	  			socket.emit('signUpResponse',{success:true});
+	      });
+	    }
+		});
+	});
+
 
 	//console.log('socket connection');
 	socket.on('disconnect',function(){
