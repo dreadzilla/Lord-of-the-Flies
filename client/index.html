@@ -142,16 +142,6 @@
 			ctx.fillRect(Bullet.list[i].x-5,Bullet.list[i].y-5,10,10);
 	},40);
 
-  socket.on('newPositions',function(data){
-    ctx.clearRect(0,0,screenSize,screenSize);
-    // Draw players
-    for (var i = 0; i < data.player.length; i++)
-      ctx.fillText(data.player[i].number,data.player[i].x,data.player[i].y);
-    // Draw bullets
-    for (var i = 0; i < data.bullet.length; i++)
-      ctx.fillRect(data.bullet[i].x-5,data.bullet[i].y-5,10,10);
-  });
-
   // Check for user keypresses
   document.onkeydown = function(event){
     if(event.keyCode === 68)    //d

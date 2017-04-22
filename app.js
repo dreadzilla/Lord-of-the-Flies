@@ -61,9 +61,9 @@ var Player = function(id){
 
 		// Create bullet randomly
 		if (self.pressingAttack){
-			for (var i = -3; i<3;i++)
-				self.shootBullet(i*10+self.mouseAngle);
-			//self.shootBullet(self.mouseAngle)
+			//for (var i = -3; i<3;i++)
+			//	self.shootBullet(i*10+self.mouseAngle);
+			self.shootBullet(self.mouseAngle)
 		}
 	}
 	self.shootBullet = function(angle){
@@ -81,7 +81,6 @@ var Player = function(id){
 		}
 		else
 			self.spdX = 0;
-
 		if(self.pressingUp){
 			self.spdY = -self.maxSpd;
 		}
@@ -92,6 +91,12 @@ var Player = function(id){
 			self.spdY = 0;
 	}
 	Player.list[id] = self;
+	initPack.player.push({
+		id:self.id,
+		x:self.x,
+		y:self.y,
+		number:self.number,
+	});
 	return self;
 }
 //
@@ -118,6 +123,7 @@ Player.onConnect = function(socket){
 // Remove disconnected player
 Player.onDisconnect = function(socket){
 	delete Player.list[socket.id];
+	removePack.player.push(socket.id);
 }
 Player.update = function(){
 	var pack = [];
@@ -126,9 +132,9 @@ Player.update = function(){
 		var player = Player.list[i];
 		player.update();
 		pack.push({
+			id: player.id,
 			x: player.x,
 			y: player.y,
-			number: player.number
 		});
 	}
 	return pack;
@@ -158,36 +164,36 @@ var Bullet = function(parent,angle){
 				}
     }
     Bullet.list[self.id] = self;
+		initPack.bullet.push({
+			id:self.id,
+			x:self.x,
+			y:self.y,
+		});
     return self;
 }
 //
 // CLASS Bullet class
 //
 Bullet.list = {};
-Bullet.update = function(){
 
+Bullet.update = function(){
 	var pack = [];
 	// Go through player list and update their data.
 	for(var i in Bullet.list){
 		var bullet = Bullet.list[i];
 		bullet.update();
-		if(bullet.toRemove)
+		if(bullet.toRemove) {
 			delete Bullet.list[i];
-		else {
+			removePack.bullet.push(bullet.id);
+		} else {
 			pack.push({
+				id: bullet.id,
 				x: bullet.x,
-				y: bullet.y
+				y: bullet.y,
 			});
 		}
 	}
 	return pack;
-}
-
-var USERS = {
-    //username:password
-    "bob":"asd",
-    "bob2":"bob",
-    "bob3":"ttt",
 }
 
 var isValidPassword = function(data,cb){
@@ -262,6 +268,10 @@ io.sockets.on('connection', function(socket){
 		socket.emit('evalAnswer',res);
 	});
 });
+
+// Init and remove
+var initPack = {player:[],bullet:[]};
+var removePack = {player:[],bullet:[]};
 // SERVER GAME LOOP
 // Servertick 25 times per second
 setInterval(function(){
@@ -270,10 +280,15 @@ setInterval(function(){
 		player:Player.update(),
 		bullet:Bullet.update()
 	}
-
 	// Send everyones' positions to the client
 	for(var i in SOCKET_LIST){
 		var socket = SOCKET_LIST[i];
-		socket.emit('newPositions',pack);
+		socket.emit('init',initPack);
+		socket.emit('update',pack);
+		socket.emit('remove',removePack);
 	}
+	initPack.player=[];
+	initPack.bullet=[];
+	removePack.player=[];
+	removePack.bullet=[];
 }, 1000/25);
