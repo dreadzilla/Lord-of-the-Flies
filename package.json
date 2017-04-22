@@ -1,0 +1,13 @@
+{
+  "name": "ld38",
+  "version": "1.0.0",
+  "description": "LD38 Small World game",
+  "main": "app.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Hakan Staby",
+  "license": "ISC"
+}
