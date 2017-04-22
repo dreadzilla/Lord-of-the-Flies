@@ -14,53 +14,71 @@ serv.listen(2000);
 console.log('Server started.');
 
 var SOCKET_LIST = {};
-var PLAYER_LIST = {};
-// Create a player with start position, number and ID and other data
-var Player = function(id){
+
+var Entity = function() {
 	var self = {
 		x:250,
 		y:250,
-		id:id,
-		number:"" + Math.floor(10*Math.random()),
-		pressingRight:false,
-		pressingLeft:false,
-		pressingUp:false,
-		pressingDown:false,
-		maxSpd:10
+		spdX:0,
+		spdY:0,
+		id:"",
 	}
-	self.updatePosition = function(){
-		if(self.pressingRight){
-			self.x += self.maxSpd;
-		}
-		if(self.pressingLeft){
-			self.x -= self.maxSpd;
-		}
-		if(self.pressingUp){
-			self.y -= self.maxSpd;
-		}
-		if(self.pressingDown){
-			self.y += self.maxSpd;
-		}
+	self.update = function(){
+		self.updatePosition();
+	}
+	self.updatePosition = function() {
+		self.x += self.spdX;
+		self.y += self.spdY;
 	}
 	return self;
 }
 
-var io = require('socket.io')(serv,{});
-io.sockets.on('connection', function(socket){
-	// Give each person connecting their own id
-	socket.id = Math.random();
-	SOCKET_LIST[socket.id] = socket;
+// Create a player with start position, number and ID and other data
+var Player = function(id){
+	var self = Entity();
+	self.id = id;
+	self.number = "" + Math.floor(10*Math.random());
+	self.pressingRight = false,
+	self.pressingLeft = false,
+	self.pressingUp = false,
+	self.pressingDown = false,
+	self.maxSpd = 10
 
+	var super_update = self.update;
+	// will call both updateSpd and the Player update.
+	self.update = function() {
+		self.updateSpd();
+		super_update();
+	}
+
+	self.updateSpd = function(){
+		if(self.pressingRight){
+			self.spdX = self.maxSpd;
+		}
+		else if(self.pressingLeft){
+			self.spdX = -self.maxSpd;
+		}
+		else
+			self.spdX = 0;
+
+		if(self.pressingUp){
+			self.spdY = -self.maxSpd;
+		}
+		else if(self.pressingDown){
+			self.spdY = self.maxSpd;
+		}
+		else
+			self.spdY = 0;
+	}
+	Player.list[id] = self;
+	return self;
+}
+//
+// CLASS PLayer class with player based stuff
+//
+Player.list = {};
+Player.onConnect = function(socket){
 	var player = Player(socket.id);
-	PLAYER_LIST[socket.id] = player;
-
-
-	//console.log('socket connection');
-	socket.on('disconnect',function(){
-		delete SOCKET_LIST[socket.id];
-		delete PLAYER_LIST[socket.id];
-	});
-
 	socket.on('keyPress',function(data){
 		if(data.inputId === 'left')
 			player.pressingLeft = data.state;
@@ -71,21 +89,69 @@ io.sockets.on('connection', function(socket){
 		else if(data.inputId === 'down')
 			player.pressingDown = data.state;
 	});
-
-});
-// Servertick 25 times per second
-setInterval(function(){
+}
+// Remove disconnected player
+Player.onDisconnect = function(socket){
+	delete Player.list[socket.id];
+}
+Player.update = function(){
 	var pack = [];
 	// Go through player list and update their data.
-	for(var i in PLAYER_LIST){
-		var player = PLAYER_LIST[i];
-		player.updatePosition();
+	for(var i in Player.list){
+		var player = Player.list[i];
+		player.update();
 		pack.push({
 			x: player.x,
 			y: player.y,
 			number: player.number
 		});
 	}
+	return pack;
+}
+// ENd Player class
+
+var Bullet = function(angle){
+    var self = Entity();
+    self.id = Math.random();
+    self.spdX = Math.cos(angle/180*Math.PI) * 10;
+    self.spdY = Math.sin(angle/180*Math.PI) * 10;
+
+    self.timer = 0;
+    self.toRemove = false;
+		// Override update loop
+    var super_update = self.update;
+    self.update = function(){
+        if(self.timer++ > 100)
+            self.toRemove = true;
+        super_update();
+    }
+    Bullet.list[self.id] = self;
+    return self;
+}
+Bullet.list = {};
+
+
+var io = require('socket.io')(serv,{});
+io.sockets.on('connection', function(socket){
+	// Give each person connecting their own id
+	socket.id = Math.random();
+	SOCKET_LIST[socket.id] = socket;
+
+	Player.onConnect(socket);
+
+	//console.log('socket connection');
+	socket.on('disconnect',function(){
+		delete SOCKET_LIST[socket.id];
+		Player.onDisconnect(socket);
+	});
+
+});
+// SERVER GAME LOOP
+// Servertick 25 times per second
+setInterval(function(){
+	// Do player update
+	var pack = Player.update();
+
 	// Send everyones' positions to the client
 	for(var i in SOCKET_LIST){
 		var socket = SOCKET_LIST[i];
