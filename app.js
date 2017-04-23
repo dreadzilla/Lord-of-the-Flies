@@ -1,11 +1,13 @@
-var mongojs = require('mongojs');
-var db = mongojs('localhost:27017/ld38',['account','progress']);
+//var mongojs = require('mongojs');
+var db = null; //mongojs('localhost:27017/ld38',['account','progress']);
 
 var express = require('express');
 var app = express();
 var serv = require('http').Server(app);
 var DEBUG = true;
 var collDist = 32; //Collision distance
+var MAPWIDTH = 500;
+var MAPHEIGHT = 500;
 
 // Redirect to start file if /
 app.get('/',function(req, res) {
@@ -19,7 +21,7 @@ console.log('Server started.');
 
 var SOCKET_LIST = {};
 // Entity class
-var Entity = function() {
+var Entity = function(param) {
 	var self = {
 		x:250,
 		y:250,
@@ -27,12 +29,23 @@ var Entity = function() {
 		spdY:0,
 		id:"",
 	}
+	if(param){
+		if(param.x)
+			self.x = param.x;
+		if(param.y)
+			self.y = param.y;
+		if(param.map)
+			self.map = param.map;
+		if(param.id)
+			self.id = param.id;
+	}
 	self.update = function(){
 		self.updatePosition();
 	}
 	self.updatePosition = function() {
 		self.x += self.spdX;
 		self.y += self.spdY;
+		//console.log(self.x);
 	}
 	self.getDistance = function(pt){
     return Math.sqrt(Math.pow(self.x-pt.x,2) + Math.pow(self.y-pt.y,2));
@@ -43,9 +56,9 @@ var Entity = function() {
 // CLASS PLayer class with player based stuff
 //
 // Create a player with start position, number and ID and other data
-var Player = function(id){
-	var self = Entity();
-	self.id = id;
+var Player = function(param){
+	var self = Entity(param);
+	self.username = param.username;
 	self.number = "" + Math.floor(10*Math.random());
 	self.pressingRight = false,
 	self.pressingLeft = false,
@@ -56,7 +69,9 @@ var Player = function(id){
 	self.maxSpd = 10,
 	self.hp = 10,
 	self.hpMax = 10,
-	self.score = 0
+	self.score = 0,
+	self.attackctr = 0, // keep check on attack speed.
+	self.atkSpd = 1
 
 	var super_update = self.update;
 	// will call both updateSpd and the Player update.
@@ -64,33 +79,57 @@ var Player = function(id){
 		self.updateSpd();
 		super_update();
 
-		// Create bullet randomly
+		// Create bullet
 		if (self.pressingAttack){
+			self.attackctr += self.atkSpd; // restrain shooting speed
+			if(self.attackctr > 3){
+				self.attackctr = 0;
+				self.shootBullet(self.mouseAngle)
+			}
 			//for (var i = -3; i<3;i++)
 			//	self.shootBullet(i*10+self.mouseAngle);
-			self.shootBullet(self.mouseAngle)
+
 		}
 	}
 	self.shootBullet = function(angle){
-		var b = Bullet(self.id,angle);
-		b.x = self.x;
-		b.y = self.y;
+		Bullet({
+			parent:self.id,
+			angle:angle,
+			x:self.x,
+			y:self.y,
+		});
 	}
 
 	self.updateSpd = function(){
+		// Add map collision here. The user can't travel farther than the map
+		// Borders are hard coded now.
+		//console.log(self.x);
 		if(self.pressingRight){
-			self.spdX = self.maxSpd;
+			if (self.x < 770)
+				self.spdX = self.maxSpd;
+			else {
+				self.spdX = 0;
+			}
 		}
 		else if(self.pressingLeft){
-			self.spdX = -self.maxSpd;
+			if (self.x > 30)
+				self.spdX = -self.maxSpd;
+			else
+				self.spdX = 0;
 		}
 		else
 			self.spdX = 0;
 		if(self.pressingUp){
-			self.spdY = -self.maxSpd;
+			if(self.y > 30)
+				self.spdY = -self.maxSpd;
+			else
+				self.spdY = 0;
 		}
 		else if(self.pressingDown){
-			self.spdY = self.maxSpd;
+			if(self.y < 550)
+				self.spdY = self.maxSpd;
+			else
+				self.spdY = 0;
 		}
 		else
 			self.spdY = 0;
@@ -115,14 +154,18 @@ var Player = function(id){
 			score: self.score,
 		};
 	}
-	Player.list[id] = self;
+	Player.list[self.id] = self;
 	initPack.player.push(self.getInitPack());
 	return self;
 }
 
 Player.list = {};
-Player.onConnect = function(socket){
-	var player = Player(socket.id);
+Player.onConnect = function(socket,username){
+	var player = Player({
+		username:username,
+		id:socket.id,
+	});
+
 	socket.on('keyPress',function(data){
 		if(data.inputId === 'left')
 			player.pressingLeft = data.state;
@@ -137,7 +180,14 @@ Player.onConnect = function(socket){
 		else if(data.inputId === 'mouseAngle')
 			player.mouseAngle = data.state;
 	});
-// Initialize player stuff
+	// Send chats out.
+	socket.on('sendMsgToServer',function(data){
+		//var playerName = ("" + socket.id).slice(2,7)
+		for (var i in SOCKET_LIST){
+			SOCKET_LIST[i].emit('addToChat',player.username+': '+data);
+		}
+	});
+	// Initialize player stuff
 	socket.emit('init', {
 		selfId:socket.id, //refer player
 		player:Player.getAllInitPack(),
@@ -169,12 +219,13 @@ Player.update = function(){
 //
 // CLASS Bullet class
 //
-var Bullet = function(parent,angle){
-    var self = Entity();
+var Bullet = function(param){
+    var self = Entity(param);
     self.id = Math.random();
-    self.spdX = Math.cos(angle/180*Math.PI) * 10;
-    self.spdY = Math.sin(angle/180*Math.PI) * 10;
-		self.parent = parent;
+		self.angle = param.angle;
+    self.spdX = Math.cos(param.angle/180*Math.PI) * 10;
+    self.spdY = Math.sin(param.angle/180*Math.PI) * 10;
+		self.parent = param.parent;
     self.timer = 0;
     self.toRemove = false;
 		// Override update loop
@@ -246,27 +297,13 @@ Bullet.update = function(){
 }
 
 var isValidPassword = function(data,cb){
-	db.account.find({username:data.username,password:data.password},function(err,res){
-		if(res.length>0)
-			cb(true);
-		else {
-			cb(false);
-		}
-	});
+	return cb(true);
 }
 var isUsernameTaken = function(data,cb){
-	db.account.find({username:data.username},function(err,res){
-		if(res.length>0)
-			cb(true);
-		else {
-			cb(false);
-		}
-	});
+	return cb(false);
 }
 var addUser = function(data,cb){
-	db.account.insert({username:data.username,password:data.password},function(err){
-		cb();
-	});
+	return(cb);
 }
 
 var io = require('socket.io')(serv,{});
@@ -278,7 +315,7 @@ io.sockets.on('connection', function(socket){
 	socket.on('signIn',function(data){
 		isValidPassword(data,function(res){
 	  	if(res){
-	    	Player.onConnect(socket);
+	    	Player.onConnect(socket,data.username);
 	      socket.emit('signInResponse',{success:true});
 			} else {
 	     	socket.emit('signInResponse',{success:false});
@@ -302,13 +339,6 @@ io.sockets.on('connection', function(socket){
 	socket.on('disconnect',function(){
 		delete SOCKET_LIST[socket.id];
 		Player.onDisconnect(socket);
-	});
-	// Send chats out.
-	socket.on('sendMsgToServer',function(data){
-		var playerName = ("" + socket.id).slice(2,7)
-		for (var i in SOCKET_LIST){
-			SOCKET_LIST[i].emit('addToChat',playerName+': '+data);
-		}
 	});
 	socket.on('evalServer',function(data){
 		if (!DEBUG)
