@@ -1,7 +1,7 @@
 <!-- A small world theme game create for Ludum Dare 38 -->
 <!-- Author: Hakan Staby, 2017-Apr-24 -->
 
-<div id="signDiv" align="center" style="margin:auto">
+<div id="signDiv" style="margin:20;">
   <h1>Lord of the Flies!</h1>An LD38 entry.
   <p>
   Enter name to begin: <input id="signDiv-username" type="text"></input>
@@ -12,10 +12,11 @@
     Kill everyone else to score points.<br>
     W,A,S,D to move around. Mouse to aim and shoot.<br>
     One point for each kill.<br>
+    This is a multiplayer online game.
   </p>
 </div>
 
-<div id="gameDiv" style="display:none;">
+<div id="gameDiv" style="display:none;margin:auto;">
   <canvas id="ctx" width="500" height="500" style="border:1px solid #000000;background:#3F92FF;"></canvas>
 
   <div id="chat-text" style="width:500px;height:100px;overflow-y:scroll;">
@@ -24,9 +25,8 @@
   <form id="chat-form">
     <input id="chat-input" type="text" style="width:500px"></input>
   </form>
-  // Don't show controls for now.
   <div id="audio-ctrls" style="border:0px solid #000000;width:500px;">
-    <audio id="audioambience" autoplay="" loop="" preload="" onloadeddata="lowerVolume(0.0)">
+    <audio id="audioambience" autoplay="" loop="" preload="" onloadeddata="lowerVolume(0.2)">
      <source src="/client/sound/ambience.ogg" type="audio/ogg"></source>
      <source src="/client/sound/ambience.mp3" type="audio/mpeg"></source>
      Your browser does not support the audio element.
@@ -45,14 +45,9 @@
   var signDiv = document.getElementById('signDiv');
   var signDivUsername = document.getElementById('signDiv-username');
   var signDivSignIn = document.getElementById('signDiv-signIn');
-  //var signDivSignUp = document.getElementById('signDiv-signUp');
-  //var signDivPassword = document.getElementById('signDiv-password');
   signDivSignIn.onclick = function(){
     socket.emit('signIn',{username:signDivUsername.value,password:'dummy'});
   }
-  //signDivSignUp.onclick = function(){
-  //  socket.emit('signUp',{username:signDivUsername.value,password:signDivPassword.value});
-  //}
   socket.on('signInResponse',function(data){
     if(data.success){
       signDiv.style.display = 'none';
@@ -60,12 +55,6 @@
     } else
       alert("Sign in unsuccessful.");
   });
-  /*socket.on('signUpResponse',function(data){
-    if(data.success){
-      alert("Sign up successful.");
-    } else
-      alert("Sign up unsuccessful.");
-  });*/
 
   //CHAT
   var chatText = document.getElementById('chat-text');
@@ -131,8 +120,6 @@
       ctx.drawImage(Img.player,
         0,0,Img.player.width,Img.player.height,
         x-width/2,y-height/2,width,height);
-
-      //ctx.fillText(self.score,self.x,self.y-60); //Score
     }
 
     Player.list[self.id] = self;
@@ -155,8 +142,6 @@
       ctx.drawImage(Img.bullet,
         0,0,Img.bullet.width,Img.bullet.height,
         x-width/2,y-height/2,width,height);
-
-      //ctx.fillRect(self.x-5,self.y-5,10,10);
     }
 
     Bullet.list[self.id] = self;
@@ -179,7 +164,6 @@
   });
 
   socket.on('update',function(data){
-    //{ player : [{id:123,x:0,y:0},{id:1,x:0,y:0}], bullet: []}
     for(var i = 0 ; i < data.player.length; i++){
       var pack = data.player[i];
       var p = Player.list[pack.id];

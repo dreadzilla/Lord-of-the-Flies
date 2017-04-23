@@ -1,5 +1,5 @@
 // A small world theme game create for Ludum Dare 38
-// Author: Hakan Staby, 2017-Apr-24 
+// Author: Hakan Staby, 2017-Apr-24
 var express = require('express');
 var app = express();
 var serv = require('http').Server(app);
@@ -187,7 +187,6 @@ Player.onConnect = function(socket,username){
 	});
 	// Send chats out.
 	socket.on('sendMsgToServer',function(data){
-		//var playerName = ("" + socket.id).slice(2,7)
 		for (var i in SOCKET_LIST){
 			SOCKET_LIST[i].emit('addToChat',player.username+': '+data);
 		}
