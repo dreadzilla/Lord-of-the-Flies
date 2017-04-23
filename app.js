@@ -1,6 +1,5 @@
-//var mongojs = require('mongojs');
-var db = null; //mongojs('localhost:27017/ld38',['account','progress']);
-
+// A small world theme game create for Ludum Dare 38
+// Author: Hakan Staby, 2017-Apr-24 
 var express = require('express');
 var app = express();
 var serv = require('http').Server(app);
