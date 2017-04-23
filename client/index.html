@@ -1,8 +1,17 @@
-<div id="signDiv">
-    Username: <input id="signDiv-username" type="text"></input>
 
-    <button id="signDiv-signIn">Sign In</button>
 
+<div id="signDiv" align="center" style="margin:auto">
+  <h1>Lord of the Flies!</h1>An LD38 entry.
+  <p>
+  Enter name to begin: <input id="signDiv-username" type="text"></input>
+  <button id="signDiv-signIn">Sign In</button>
+  </p>
+  <p>
+    You are stuck on a small island and must fight for survival.<br>
+    Kill everyone else to score points.<br>
+    W,A,S,D to move around. Mouse to aim and shoot.<br>
+    One point for each kill.<br>
+  </p>
 </div>
 
 <div id="gameDiv" style="display:none;">
@@ -14,7 +23,16 @@
   <form id="chat-form">
     <input id="chat-input" type="text" style="width:500px"></input>
   </form>
+  // Don't show controls for now.
+  <div id="audio-ctrls" style="border:0px solid #000000;width:500px;">
+    <audio id="audioambience" autoplay="" loop="" preload="" onloadeddata="lowerVolume(0.0)">
+     <source src="/client/sound/ambience.ogg" type="audio/ogg"></source>
+     <source src="/client/sound/ambience.mp3" type="audio/mpeg"></source>
+     Your browser does not support the audio element.
+    </audio>
+  </div>
 </div>
+
 <!-- <script src="https://cdn.socket.io/socket.io-1.4.5.js"></script> -->
 <script src="/client/js/socket.js"></script>
 <script>
@@ -41,12 +59,12 @@
     } else
       alert("Sign in unsuccessful.");
   });
-  socket.on('signUpResponse',function(data){
+  /*socket.on('signUpResponse',function(data){
     if(data.success){
       alert("Sign up successful.");
     } else
       alert("Sign up unsuccessful.");
-  });
+  });*/
 
   //CHAT
   var chatText = document.getElementById('chat-text');
@@ -55,6 +73,7 @@
   // Receive chat.
   socket.on('addToChat',function(data){
     chatText.innerHTML += '<div>' + data + '</div>';
+    chatText.scrollTop = chatText.scrollHeight;
   });
   socket.on('evalAnswer',function(data){
     console.log(data);
@@ -76,6 +95,14 @@
   Img.bullet.src = '/client/img/bullet.png';
   Img.map = new Image();
   Img.map.src = '/client/img/map.png';
+  // Sound!
+  var Snd = {};
+  Snd.enemyhit = new Audio();
+  Snd.enemyhit.src = '/client/sound/enemyhit.wav';
+  Snd.gun = new Audio();
+  Snd.gun.src = '/client/sound/gun.wav';
+  Snd.enemykill = new Audio();
+  Snd.enemykill.src = '/client/sound/playerexplosion.wav';
 
   var ctx = document.getElementById('ctx').getContext("2d");
   ctx.font = '25px Arial';
@@ -179,7 +206,6 @@
   });
 
   socket.on('remove',function(data){
-
     for(var i = 0 ; i < data.player.length; i++){
       delete Player.list[data.player[i]];
     }
@@ -187,7 +213,14 @@
       delete Bullet.list[data.bullet[i]];
     }
   });
-
+  socket.on('sndPlayerHit',function(data){
+    if (data === 'gun')
+      Snd.gun.play();
+    else if (data === 'enemyhit')
+      Snd.enemyhit.play();
+    else if (data === 'enemykill')
+      Snd.enemykill.play();
+  });
   setInterval(function(){
     if(!selfId) // do nothing until init received
       return;
@@ -201,8 +234,8 @@
 	},40);
 
   var drawScore = function() {
-    ctx.fillStyle = 'orange';
-    ctx.fillText(Player.list[selfId].score,10,30);
+    ctx.fillStyle = 'black';
+    ctx.fillText('Score: ' + Player.list[selfId].score,10,30);
   }
   var drawMap = function() {
     var player = Player.list[selfId];
@@ -251,6 +284,11 @@
   }
   document.oncontextmeny = function(){
     event.preventDefault();
+  }
+
+  var lowerVolume = function(data){
+    var myAudio = document.getElementById("audioambience");
+    myAudio.volume = data;
   }
 
 </script>

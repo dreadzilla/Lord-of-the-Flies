@@ -50,6 +50,11 @@ var Entity = function(param) {
 	self.getDistance = function(pt){
     return Math.sqrt(Math.pow(self.x-pt.x,2) + Math.pow(self.y-pt.y,2));
   }
+	self.broadcastHit = function(action){
+		for (var i in SOCKET_LIST){
+			SOCKET_LIST[i].emit('sndPlayerHit',action);
+		}
+	}
 	return self;
 }
 //
@@ -85,6 +90,7 @@ var Player = function(param){
 			if(self.attackctr > 3){
 				self.attackctr = 0;
 				self.shootBullet(self.mouseAngle)
+				self.broadcastHit('gun');
 			}
 			//for (var i = -3; i<3;i++)
 			//	self.shootBullet(i*10+self.mouseAngle);
@@ -193,6 +199,11 @@ Player.onConnect = function(socket,username){
 		player:Player.getAllInitPack(),
 		bullets:Bullet.getAllInitPack(),
 	})
+	// Broadcast new player.
+	for (var i in SOCKET_LIST){
+		SOCKET_LIST[i].emit('addToChat',player.username+': Joins the server.');
+	}
+
 }
 Player.getAllInitPack = function(){
 	var players = [];
@@ -239,11 +250,17 @@ var Bullet = function(param){
 				if(self.getDistance(p) < collDist && self.parent !== p.id){
 					// Handle possible collision here
 					p.hp -= 1;
-
+					self.broadcastHit('enemyhit'); //Send audio
 					if (p.hp <= 0){
+						self.broadcastHit('enemykill');
 						var shooter = Player.list[self.parent];
 						if(shooter) {
 							shooter.score += 1;
+						}
+						// Broadcast kill.
+						for (var i in SOCKET_LIST){
+							SOCKET_LIST[i].emit('addToChat',shooter.username+' killed '+p.username
+							+'. What a loser! :) --'+ shooter.username+ '\'s score is now: '+shooter.score);
 						}
 						p.hp = p.hpMax;
 						p.x = Math.random() * 500;
