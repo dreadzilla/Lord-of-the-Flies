@@ -18,7 +18,7 @@ serv.listen(2000);
 console.log('Server started.');
 
 var SOCKET_LIST = {};
-
+// Entity class
 var Entity = function() {
 	var self = {
 		x:250,
@@ -39,7 +39,9 @@ var Entity = function() {
   }
 	return self;
 }
-
+//
+// CLASS PLayer class with player based stuff
+//
 // Create a player with start position, number and ID and other data
 var Player = function(id){
 	var self = Entity();
@@ -51,7 +53,10 @@ var Player = function(id){
 	self.pressingDown = false,
 	self.pressingAttack = false,
 	self.mouseAngle = 0,
-	self.maxSpd = 10
+	self.maxSpd = 10,
+	self.hp = 10,
+	self.hpMax = 10,
+	self.score = 0
 
 	var super_update = self.update;
 	// will call both updateSpd and the Player update.
@@ -90,18 +95,31 @@ var Player = function(id){
 		else
 			self.spdY = 0;
 	}
+	self.getInitPack = function(){
+		return {
+			id:self.id,
+			x:self.x,
+			y:self.y,
+			number:self.number,
+			hp: self.hp,
+			hpMax: self.hpMax,
+			score: self.score,
+		};
+	}
+	self.getUpdatePack = function(){
+		return {
+			id: self.id,
+			x: self.x,
+			y: self.y,
+			hp: self.hp,
+			score: self.score,
+		};
+	}
 	Player.list[id] = self;
-	initPack.player.push({
-		id:self.id,
-		x:self.x,
-		y:self.y,
-		number:self.number,
-	});
+	initPack.player.push(self.getInitPack());
 	return self;
 }
-//
-// CLASS PLayer class with player based stuff
-//
+
 Player.list = {};
 Player.onConnect = function(socket){
 	var player = Player(socket.id);
@@ -119,6 +137,18 @@ Player.onConnect = function(socket){
 		else if(data.inputId === 'mouseAngle')
 			player.mouseAngle = data.state;
 	});
+// Initialize player stuff
+	socket.emit('init', {
+		selfId:socket.id, //refer player
+		player:Player.getAllInitPack(),
+		bullets:Bullet.getAllInitPack(),
+	})
+}
+Player.getAllInitPack = function(){
+	var players = [];
+	for (var i in Player.list)
+		players.push(Player.list[i].getInitPack());
+	return players;
 }
 // Remove disconnected player
 Player.onDisconnect = function(socket){
@@ -131,16 +161,14 @@ Player.update = function(){
 	for(var i in Player.list){
 		var player = Player.list[i];
 		player.update();
-		pack.push({
-			id: player.id,
-			x: player.x,
-			y: player.y,
-		});
+		pack.push(player.getUpdatePack());
 	}
 	return pack;
 }
 // ENd Player class
-
+//
+// CLASS Bullet class
+//
 var Bullet = function(parent,angle){
     var self = Entity();
     self.id = Math.random();
@@ -152,28 +180,53 @@ var Bullet = function(parent,angle){
 		// Override update loop
     var super_update = self.update;
     self.update = function(){
-        if(self.timer++ > 100)
-            self.toRemove = true;
-        super_update();
-				for(var i in Player.list){
-					var p = Player.list[i];
-					if(self.getDistance(p) < collDist && self.parent !== p.id){
-						// Handle possible collision here
-						self.toRemove=true;
+    	if(self.timer++ > 100)
+        self.toRemove = true;
+      super_update();
+			for(var i in Player.list){
+				var p = Player.list[i];
+				if(self.getDistance(p) < collDist && self.parent !== p.id){
+					// Handle possible collision here
+					p.hp -= 1;
+
+					if (p.hp <= 0){
+						var shooter = Player.list[self.parent];
+						if(shooter) {
+							shooter.score += 1;
+						}
+						p.hp = p.hpMax;
+						p.x = Math.random() * 500;
+						p.y = Math.random() * 500;
 					}
+					self.toRemove=true;
 				}
+			}
     }
+		self.getInitPack = function(){
+			return {
+				id:self.id,
+				x:self.x,
+				y:self.y,
+			}
+		}
+		self.getUpdatePack = function(){
+			return {
+				id: self.id,
+				x: self.x,
+				y: self.y,
+			}
+		}
     Bullet.list[self.id] = self;
-		initPack.bullet.push({
-			id:self.id,
-			x:self.x,
-			y:self.y,
-		});
+		initPack.bullet.push(self.getInitPack());
     return self;
 }
-//
-// CLASS Bullet class
-//
+Bullet.getAllInitPack = function(){
+	var bullets = [];
+	for (var i in Bullet.list)
+		bullets.push(Bullet.list[i].getInitPack());
+	return bullets;
+}
+
 Bullet.list = {};
 
 Bullet.update = function(){
@@ -186,11 +239,7 @@ Bullet.update = function(){
 			delete Bullet.list[i];
 			removePack.bullet.push(bullet.id);
 		} else {
-			pack.push({
-				id: bullet.id,
-				x: bullet.x,
-				y: bullet.y,
-			});
+			pack.push(bullet.getUpdatePack());
 		}
 	}
 	return pack;
