@@ -10,10 +10,16 @@ Enjoy!
 Updated info:
 
 The game requires Node.js.
+
 Install node.js
+
 install npm
+
 Install: 
+
 npm install express
+
 npm install socket.io
+
 
 Start node.js and you should be ready to go using your browser directed to port 2000.
