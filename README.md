@@ -13,6 +13,7 @@ The game requires Node.js.
 
 * Install node.js
 * install npm
+
 Install: 
 * npm install express
 * npm install socket.io
