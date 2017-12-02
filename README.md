@@ -8,13 +8,13 @@ The game was written in JavaScript/HTML5 with the help of node.js, express and s
 Enjoy!
 
 Updated info:
+
 The game requires Node.js.
 
-Install node.js
-install npm
+* Install node.js
+* install npm
 Install: 
-npm install express
-npm install socket.io
-
+* npm install express
+* npm install socket.io
 
 Start node.js and you should be ready to go using your browser directed to port 2000.
