@@ -12,7 +12,7 @@ Updated info:
 The game requires Node.js.
 
 * Install node.js
-* install npm
+* Install npm
 
 Install: 
 * npm install express
